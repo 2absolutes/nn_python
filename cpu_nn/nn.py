@@ -51,12 +51,13 @@ class Network(object):
         :param a_prev: activations from previous layer. Will be input values for 1st hidden layer
         :param l_weight: weight params for current layer
         :param l_bias: biases for current layer
-        :return: (l_weight * a) + l_bias
+        :return: (l_weight * a) + l_bias, cache (components used to calculate z for this layer)
         """
 
         z = np.dot(l_weight, a_prev) + l_bias
+        cache = (a_prev, l_weight, l_bias)
 
-        return z
+        return z, cache
 
     @staticmethod
     def _activation_sigmoid(z):
@@ -69,23 +70,42 @@ class Network(object):
 
         return a
 
-    def _one_layer_forward_propagation(self, a_prev, l_weight, l_bias):
+    @staticmethod
+    def _activation_relu(z):
+        """
+        sigmoid activation function
+        :param z: linear part of the forward layer. Apply the sigmoid function on this.
+        :return: The result of applying the relu function on z
+        """
+        a = np.max(0, z)
+
+        return a
+
+    def _one_layer_forward_propagation(self, a_prev, l_weight, l_bias, activation="sigmoid"):
         """
         One pass of forward propagation across the network.
         :param a_prev: activations from previous layer
         :param l_weight: weight parameters of this layer
         :param l_bias: bias parameters of this layer
+        :param activation: the activation function to use for this layer
         :return: the activation from this layer
         """
-        z = self._one_layer_linear_forward(a_prev, l_weight, l_bias)
+        z, l_linear_cache = self._one_layer_linear_forward(a_prev, l_weight, l_bias)
 
-        # TODO: control activation function by an argument. Different layers can have different activation functions
-        a = self._activation_sigmoid(z)
+        # TODO: Support more activation functions.
+        if activation == "sigmoid":
+            a = self._activation_sigmoid(z)
+        elif activation == "relu":
+            a = self._activation_relu(z)
+        else:
+            raise ValueError("{} activation function is not supported!".format(activation))
 
         if self._debug:
             print("weights: {}, biases: {}, z: {}, a: {}".format(l_weight, l_bias, z, a))
 
-        return a
+        l_cache = (l_linear_cache, z)
+
+        return a, l_cache
 
     def forward_propagation(self, x):
         """
@@ -93,11 +113,13 @@ class Network(object):
         :param x: one batch of input data, shape: (input_size, num_of_samples)
         :return: the final activation from the last layer
         """
-        a = x  # Assigning the input to a for reusability in the for loop below below
+        a = x  # Assigning the input to "a" for reusability in the for loop below below
+        caches = []
         for l_weight, l_bias in zip(self.weights, self.biases):
-            a = self._one_layer_forward_propagation(a, l_weight, l_bias)
+            a, cache = self._one_layer_forward_propagation(a, l_weight, l_bias)
+            caches.append(cache)
 
-        return a
+        return a, caches
 
     @staticmethod
     def _cost_cross_entropy(y, y_h):
@@ -111,7 +133,20 @@ class Network(object):
         batch_size = y.shape[1]
 
         cost = (-1 * 1/batch_size) * sum([yi * np.log(y_hi) + (1-yi)*np.log(1-y_hi) for yi, y_hi in zip(y, y_h)][0])
+
+        cost = np.squeeze(cost)  # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
+
         return cost
+
+    @staticmethod
+    def _one_layer_linear_backward(dz, cache):
+        """
+
+        :param dz:
+        :param cache:
+        :return:
+        """
+        pass
 
 
 if __name__ == "__main__":
