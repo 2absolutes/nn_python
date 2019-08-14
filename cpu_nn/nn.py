@@ -83,7 +83,7 @@ class Network(object):
 
     def _one_layer_forward_propagation(self, a_prev, l_weight, l_bias, activation="sigmoid"):
         """
-        One pass of forward propagation across the network.
+        One pass of forward propagation across one layer. i.e g(wx = b) where g is the activation function
         :param a_prev: activations from previous layer
         :param l_weight: weight parameters of this layer
         :param l_bias: bias parameters of this layer
@@ -112,6 +112,8 @@ class Network(object):
         One pass of forward propagation across the network (all layers).
         :param x: one batch of input data, shape: (input_size, num_of_samples)
         :return: the final activation from the last layer
+
+        TODO: Support different activation functions for different layers
         """
         a = x  # Assigning the input to "a" for reusability in the for loop below below
         caches = []
@@ -141,12 +143,85 @@ class Network(object):
     @staticmethod
     def _one_layer_linear_backward(dz, cache):
         """
-
-        :param dz:
-        :param cache:
+        Implements the linear part of the back propagation for one layer
+        :param dz: derivative of the cost w.r.t the linear output (i.e Z) for this layer
+        :param cache: tuple (a_prev, weight, bias) used to calculate z (during forward propagation) for this layer.
         :return:
         """
-        pass
+        a_prev, l_weight, l_bias = cache
+        batch_size = a_prev.shpae[1]  # since the batch size is not explicitly store anywhere, we can get it like this
+
+        dw = (1/batch_size) * np.matmul(dz, a_prev.T)
+        db = (1/batch_size) * np.sum(dz, axis=1, keepdims=True)
+        da_prev = np.matmul(l_weight.T, dz)
+
+        return da_prev, dw, db
+
+    def _one_layer_backward_propagation(self, da, cache, activation="sigmoid"):
+        """
+
+        :param da:
+        :param cache:
+        :param activation:
+        :return:
+        """
+
+        linear_cache, z = cache
+
+        if activation == "sigmoid":
+            dz = da * self._sigmoid_prime(z)
+        else:
+            raise ValueError("Activation function {} not supported".format(activation))
+
+        da_prev, dw, db = self._one_layer_linear_backward(dz, linear_cache)
+
+        return da_prev, dw, db
+
+    def _sigmoid_prime(self, z):
+        """
+        Derivative of sigmoid function
+        :param z: value to compute the sigmoid of and then take derivative w.r.t
+        :return:
+        """
+        return self._activation_sigmoid(z) * (1 - self._activation_sigmoid(z))
+
+    def backward_propagation(self, a_last, y, caches):
+        """
+
+        :param a_last:
+        :param y:
+        :param caches:
+        :return:
+        """
+        gradients = [None] * self.num_layers
+        batch_size = a_last.shape[1]
+        y = y.reshape(a_last.shape)  # Just to make sure shapes of both a and y match
+
+        da_last = -1 * (np.divide(y, a_last) + np.divide(1-y, 1-a_last))
+
+        l_cache = caches[self.num_layers - 1]
+        l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(da_last, l_cache)
+        gradients[self.num_layers - 1] = (l_da, l_dweight, l_dbias)
+
+        for layer in reversed((range(self.num_layers - 1))):
+            l_cache = caches[layer]
+            l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(l_da, l_cache)
+            gradients[layer] = (l_da, l_dweight, l_dbias)
+
+        return gradients
+
+    def update_parameters(self, weights, biases, gradients, learning_rate):
+        """
+        
+        :param weights:
+        :param biases:
+        :param gradients:
+        :param learning_rate:
+        :return:
+        """
+        for layer in range(self.num_layers):
+            weights[layer] = weights[layer] - learning_rate*gradients[layer][1]
+            biases[layer] = biases[layer] - learning_rate*gradients[layer][2]
 
 
 if __name__ == "__main__":
