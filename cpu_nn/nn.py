@@ -2,7 +2,7 @@ import numpy as np
 
 # TODO: Current code architecture does not allow to set up each layers separately
 # 1. Each layers can be initialized in a different way
-# 2. Different activation functions can be used for different layers
+# 2. Different activation functions can be used for different layers (will require work for both back and forward prop)
 
 
 class Network(object):
