@@ -5,6 +5,17 @@ from matplotlib import pyplot as plt
 from cpu_nn.nn import Network
 
 
+def read_data(data_path):
+    raw_data = np.genfromtxt(data_path, delimiter=',')
+    print(raw_data.shape)
+
+    return raw_data
+
+
+def split_train_test(raw_data):
+    pass
+
+
 def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False):  # lr was 0.009
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
@@ -28,7 +39,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
 
     # Parameters initialization. (≈ 1 line of code)
     ### START CODE HERE ###
-    network_obj = Network([FEATURE_SIZE, 10, 5], seed=1, debug=True)
+    network_obj = Network(layers_dims, seed=1, debug=True)
     parameters = None
     ### END CODE HERE ###
 
@@ -52,7 +63,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
 
         # Update parameters.
         ### START CODE HERE ### (≈ 1 line of code)
-        parameters = network_obj.update_parameters(gradients=grads, learning_rate=0.001)
+        parameters = network_obj.update_parameters(gradients=grads, learning_rate=learning_rate)
         ### END CODE HERE ###
 
         # Print the cost every 100 training example
@@ -69,3 +80,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     plt.show()
 
     return parameters
+
+
+if __name__ == "__main__":
+    read_data("../data/iris.data")
