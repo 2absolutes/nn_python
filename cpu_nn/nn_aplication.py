@@ -1,5 +1,8 @@
+# coding=utf-8
 import numpy as np
 from matplotlib import pyplot as plt
+
+from cpu_nn.nn import Network
 
 
 def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False):  # lr was 0.009
@@ -21,8 +24,11 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     np.random.seed(1)
     costs = []  # keep track of cost
 
+    FEATURE_SIZE = X.shape[0]
+
     # Parameters initialization. (≈ 1 line of code)
     ### START CODE HERE ###
+    network_obj = Network([FEATURE_SIZE, 10, 5], seed=1, debug=True)
     parameters = None
     ### END CODE HERE ###
 
@@ -31,22 +37,22 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
 
         # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
         ### START CODE HERE ### (≈ 1 line of code)
-        AL, caches = None
+        AL, caches = network_obj.forward_propagation(X)
         ### END CODE HERE ###
 
         # Compute cost.
         ### START CODE HERE ### (≈ 1 line of code)
-        cost = None
+        cost = network_obj.cost_cross_entropy(Y, AL)
         ### END CODE HERE ###
 
         # Backward propagation.
         ### START CODE HERE ### (≈ 1 line of code)
-        grads = None
+        grads = network_obj.backward_propagation(AL, Y, caches)
         ### END CODE HERE ###
 
         # Update parameters.
         ### START CODE HERE ### (≈ 1 line of code)
-        parameters = None
+        parameters = network_obj.update_parameters(gradients=grads, learning_rate=0.001)
         ### END CODE HERE ###
 
         # Print the cost every 100 training example

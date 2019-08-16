@@ -124,7 +124,7 @@ class Network(object):
         return a, caches
 
     @staticmethod
-    def _cost_cross_entropy(y, y_h):
+    def cost_cross_entropy(y, y_h):
         """
         Computes the cross entropy loss between the real and predicted values
         :param y: real ("ground truth") values, shape (1, batch_size)
@@ -185,7 +185,7 @@ class Network(object):
         """
         return self._activation_sigmoid(z) * (1 - self._activation_sigmoid(z))
 
-    def backward_propagation(self, a_last, y, caches):
+    def backward_propagation(self, a_last, y, caches, cost_function="cross_entropy", da_last = None):
         """
 
         :param a_last:
@@ -197,7 +197,11 @@ class Network(object):
         batch_size = a_last.shape[1]
         y = y.reshape(a_last.shape)  # Just to make sure shapes of both a and y match
 
-        da_last = -1 * (np.divide(y, a_last) + np.divide(1-y, 1-a_last))
+        if not da_last:
+            if cost_function == "cross_entropy":
+                da_last = -1 * (np.divide(y, a_last) + np.divide(1-y, 1-a_last))
+            else:
+                raise ValueError("{} cost function not supported".format(cost_function))
 
         l_cache = caches[self.num_layers - 1]
         l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(da_last, l_cache)
@@ -210,18 +214,16 @@ class Network(object):
 
         return gradients
 
-    def update_parameters(self, weights, biases, gradients, learning_rate):
+    def update_parameters(self, gradients, learning_rate):
         """
-        
-        :param weights:
-        :param biases:
+
         :param gradients:
         :param learning_rate:
         :return:
         """
         for layer in range(self.num_layers):
-            weights[layer] = weights[layer] - learning_rate*gradients[layer][1]
-            biases[layer] = biases[layer] - learning_rate*gradients[layer][2]
+            self.weights[layer] = self.weights[layer] - learning_rate*gradients[layer][1]
+            self.biases[layer] = self.biases[layer] - learning_rate*gradients[layer][2]
 
 
 if __name__ == "__main__":
