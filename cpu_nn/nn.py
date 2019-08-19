@@ -30,8 +30,8 @@ class Network(object):
 
         if self._debug:
             print("Layers: \n", sizes)
-            print("\nWeights: \n", self.weights)
-            print("\nBiases: \n", self.biases)
+            print("\nWeights: \n\t length: {},\n\t values: \n\t {}".format(len(self.weights), self.weights))
+            print("\nBiases: \n\t length: {},\n\t values: \n\t {}".format(len(self.biases), self.biases))
 
     def _initialize_parameters(self):
         """
@@ -66,7 +66,7 @@ class Network(object):
         :param z: linear part of the forward layer. Apply the sigmoid function on this.
         :return: The result of applying the sigmoid function on z
         """
-        a = 1/(1.0 + np.exp(-z))
+        a = 1.0/(1.0 + np.exp(-z))
 
         return a
 
@@ -101,7 +101,8 @@ class Network(object):
             raise ValueError("{} activation function is not supported!".format(activation))
 
         if self._debug:
-            print("weights: {}, biases: {}, z: {}, a: {}".format(l_weight, l_bias, z, a))
+            print("\nShapes:\nweights: {}, a_prev:{}, biases: {}, a:{}".format(l_weight.shape, a_prev.shape, l_bias.shape, a.shape))
+            print("\nValues:\nweights: \n{}, \nbiases: \n{}, \nz: \n{}, \na: \n{}".format(l_weight, l_bias, z, a))
 
         l_cache = (l_linear_cache, z)
 
@@ -115,10 +116,13 @@ class Network(object):
 
         TODO: Support different activation functions for different layers
         """
+        print("Check: W:\n{}, \nb:\n{}".format(self.weights, self.biases))
         a = x  # Assigning the input to "a" for reusability in the for loop below below
         caches = []
         for l_weight, l_bias in zip(self.weights, self.biases):
             a, cache = self._one_layer_forward_propagation(a, l_weight, l_bias)
+            # if self._debug:
+            print("A for this layer", a)
             caches.append(cache)
 
         return a, caches
@@ -149,7 +153,7 @@ class Network(object):
         :return:
         """
         a_prev, l_weight, l_bias = cache
-        batch_size = a_prev.shpae[1]  # since the batch size is not explicitly store anywhere, we can get it like this
+        batch_size = a_prev.shape[1]  # since the batch size is not explicitly store anywhere, we can get it like this
 
         dw = (1/batch_size) * np.matmul(dz, a_prev.T)
         db = (1/batch_size) * np.sum(dz, axis=1, keepdims=True)
@@ -188,12 +192,15 @@ class Network(object):
     def backward_propagation(self, a_last, y, caches, cost_function="cross_entropy", da_last = None):
         """
 
+        :param cost_function:
+        :param da_last:
         :param a_last:
         :param y:
         :param caches:
         :return:
         """
-        gradients = [None] * self.num_layers
+        hidden_layers = self.num_layers - 1
+        gradients = [None] * hidden_layers
         batch_size = a_last.shape[1]
         y = y.reshape(a_last.shape)  # Just to make sure shapes of both a and y match
 
@@ -203,11 +210,11 @@ class Network(object):
             else:
                 raise ValueError("{} cost function not supported".format(cost_function))
 
-        l_cache = caches[self.num_layers - 1]
+        l_cache = caches[hidden_layers - 1]
         l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(da_last, l_cache)
-        gradients[self.num_layers - 1] = (l_da, l_dweight, l_dbias)
+        gradients[hidden_layers - 1] = (l_da, l_dweight, l_dbias)
 
-        for layer in reversed((range(self.num_layers - 1))):
+        for layer in reversed((range(hidden_layers - 1))):
             l_cache = caches[layer]
             l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(l_da, l_cache)
             gradients[layer] = (l_da, l_dweight, l_dbias)
@@ -221,10 +228,65 @@ class Network(object):
         :param learning_rate:
         :return:
         """
-        for layer in range(self.num_layers):
+        if self._debug:
+            print("Old Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+
+        for layer in range(self.num_layers - 1):
             self.weights[layer] = self.weights[layer] - learning_rate*gradients[layer][1]
             self.biases[layer] = self.biases[layer] - learning_rate*gradients[layer][2]
 
+        if self._debug:
+            print("New Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+
 
 if __name__ == "__main__":
-    network_obj = Network(sizes=[4, 3, 2, 1], seed=0, debug=True)
+    network_obj = Network(sizes=[4, 3, 2, 1], seed=0, debug=False)
+
+    # ----- Check _one_layer_linear_forward()
+
+    W = np.array([[ 1.74481176, -0.7612069,   0.3190391 ]])
+    A = np.array([[ 1.62434536, -0.61175641],
+                       [-0.52817175, -1.07296862],
+                       [ 0.86540763, -2.3015387 ]])
+    b = np.array([[-0.24937038]])
+    print(network_obj._one_layer_linear_forward(A, W, b)[0])
+
+    # ----- Check _one_layer_forward_propagation()
+
+    A_prev = np.array([[-0.41675785, -0.05626683],
+                       [-2.1361961,   1.64027081],
+                      [-1.79343559, -0.84174737]])
+    W = np.array([[ 0.50288142, -1.24528809, -1.05795222]])
+    b = np.array([[-0.90900761]])
+
+    print(network_obj._one_layer_forward_propagation(A_prev, W, b, activation="sigmoid")[0])
+
+    # ----- Check _one_layer_forward_propagation()
+    X = np.array([[-0.31178367,  0.72900392,  0.21782079, -0.8990918 ],
+         [-2.48678065,  0.91325152,  1.12706373, -1.51409323],
+         [ 1.63929108, -0.4298936,   2.63128056,  0.60182225],
+         [-0.33588161,  1.23773784,  0.11112817,  0.12915125],
+         [ 0.07612761, -0.15512816,  0.63422534 , 0.810655  ]])
+
+    W = [np.array([[ 0.35480861,  1.81259031, -1.3564758 , -0.46363197,  0.82465384],
+                   [-1.17643148,  1.56448966,  0.71270509, -0.1810066 ,  0.53419953],
+                   [-0.58661296, -1.48185327,  0.85724762,  0.94309899,  0.11444143],
+                   [-0.02195668, -2.12714455, -0.83440747, -0.46550831,  0.23371059]]),
+         np.array([[-0.12673638, -1.36861282, 1.21848065, -0.85750144],
+                   [-0.56147088, -1.0335199, 0.35877096, 1.07368134],
+                   [-0.37550472, 0.39636757, -0.47144628, 2.33660781]]),
+         np.array([[0.9398248, 0.42628539, -0.75815703]])
+         ]
+    b = [np.array([[ 1.38503523],
+                   [-0.51962709],
+                   [-0.78015214],
+                   [ 0.95560959]]),
+         np.array([[ 1.50278553],
+                   [-0.59545972],
+                   [ 0.52834106]]), np.array([[-0.16236698]])]
+
+    # print(W.shape, b.shape)
+
+    network_obj.weights = W
+    network_obj.biases = b
+    print(network_obj.forward_propagation(X)[0])
