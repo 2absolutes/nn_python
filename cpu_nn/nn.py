@@ -4,9 +4,10 @@ import numpy as np
 # TODO: Current code architecture does not allow to set up each layers separately
 # 1. Each layers can be initialized in a different way
 # 2. Different activation functions can be used for different layers (will require work for both back and forward prop)
-
+# 3. Support different solvers (eg: adam, sgd, batch gd, etc)
 
 class Network(object):
+    UPDATE_FLAG = True
 
     def __init__(self, sizes, seed=None, debug=False):
         """
@@ -78,7 +79,7 @@ class Network(object):
         :param z: linear part of the forward layer. Apply the sigmoid function on this.
         :return: The result of applying the relu function on z
         """
-        a = np.max(0, z)
+        a = np.maximum(0, z)
 
         return a
 
@@ -190,7 +191,18 @@ class Network(object):
         :param z: value to compute the sigmoid of and then take derivative w.r.t
         :return:
         """
-        return self._activation_sigmoid(z) * (1 - self._activation_sigmoid(z))
+        return (self._activation_sigmoid(z) * (1 - self._activation_sigmoid(z)))
+
+    @staticmethod
+    def _relu_prime(z):
+        """
+        Derivative of ReLU function
+        :param z: value to compute the relu of and then take derivative w.r.t
+        :return:
+        """
+        z[z <= 0] = 0
+        z[z > 1] = 1
+        return z
 
     def backward_propagation(self, a_last, y, caches, cost_function="cross_entropy", da_last=None):
         """
@@ -217,7 +229,7 @@ class Network(object):
         l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(da_last, l_cache)
         gradients[hidden_layers - 1] = (l_da, l_dweight, l_dbias)
 
-        for layer in reversed((range(hidden_layers - 1))):
+        for layer in reversed(range(hidden_layers - 1)):
             l_cache = caches[layer]
             l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(l_da, l_cache)
             gradients[layer] = (l_da, l_dweight, l_dbias)
@@ -231,15 +243,21 @@ class Network(object):
         :param learning_rate:
         :return:
         """
-        if self._debug:
-            print("Old Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+        hidden_layers = len(gradients)
+        if self._debug or self.UPDATE_FLAG:
+            old_weight, old_biases = np.array(self.weights), np.array(self.biases)
+            print("\n---------\n\nOld Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+            print("\nGrads:{}".format(gradients[1][1]))
 
-        for layer in range(self.num_layers - 1):
+        for layer in range(hidden_layers):
             self.weights[layer] = self.weights[layer] - learning_rate * gradients[layer][1]
             self.biases[layer] = self.biases[layer] - learning_rate * gradients[layer][2]
 
-        if self._debug:
-            print("New Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+        if self._debug or self.UPDATE_FLAG:
+            print("\nNew Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
+
+        if self._debug or self.UPDATE_FLAG:
+            print("\nUpdated by: \nweights:{}, \nbiases:{}".format(np.array(self.weights) - old_weight, np.array(self.biases - old_biases)))
 
 
 if __name__ == "__main__":
@@ -365,6 +383,8 @@ if __name__ == "__main__":
 
     print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[0][1])
 
+    # ----- Check update_parameters()
+
     W = [np.array([[-0.41675785, -0.05626683, -2.1361961, 1.64027081],
                    [-1.79343559, -0.84174737, 0.50288142, -1.24528809],
                    [-1.05795222, -0.90900761, 0.55145404, 2.29220801]]),
@@ -374,12 +394,17 @@ if __name__ == "__main__":
                    [0.53905832]]),
          np.array([[-0.74787095]])]
 
-    grads = [("da2", np.array([[-0.40467741, -0.54535995, -1.54647732]]), np.array([[0.98236743]])),
-             ("da1", np.array([[1.78862847, 0.43650985, 0.09649747, -1.8634927],
-                               [-0.2773882, -0.35475898, -0.08274148, -0.62700068],
-                               [-0.04381817, -0.47721803, -1.31386475, 0.88462238]]), np.array([[0.88131804],
-                                                                                                [1.70957306],
-                                                                                                [0.05003364]]))]
+    grads = [("da1NotUsed",
+              np.array([[1.78862847, 0.43650985, 0.09649747, -1.8634927],
+                        [-0.2773882, -0.35475898, -0.08274148, -0.62700068],
+                        [-0.04381817, -0.47721803, -1.31386475, 0.88462238]]),
+              np.array([[0.88131804],
+                        [1.70957306],
+                        [0.05003364]])),
+             ("da2NotUsed",
+              np.array([[-0.40467741, -0.54535995, -1.54647732]]),
+              np.array([[0.98236743]]))]
     network_obj.weights = W
     network_obj.biases = b
-    print("\n\n", network_obj.update_parameters(grads, 0.1))
+    network_obj.update_parameters(grads, 0.1)
+    print("\n\nW:{}, \nb:{}".format(network_obj.weights, network_obj.biases))

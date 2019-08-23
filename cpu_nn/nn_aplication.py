@@ -4,7 +4,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from cpu_nn.nn import Network
-
+from sklearn.neural_network import MLPClassifier
 
 def read_data(data_path):
     # raw_data = np.genfromtxt(data_path, delimiter=',', dtype=None)
@@ -18,7 +18,7 @@ def convert_label_to_binary(data_df, primary_label, label_col_index=-1):
     return data_df
 
 
-def split_train_test(raw_data, train_fraction = 0.8, seed = None):
+def split_train_test(raw_data, train_fraction=0.8, seed=None):
     # Shuffling the data
     raw_data = raw_data.sample(frac=1, random_state=seed)
 
@@ -38,7 +38,7 @@ def split_train_test(raw_data, train_fraction = 0.8, seed = None):
     return train_data_x, train_data_y, test_data_x, test_data_y
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False, batch_size=None):
+def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -57,34 +57,17 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     np.random.seed(1)
     costs = []  # keep track of cost
 
-    FEATURE_SIZE = X.shape[0]
-
-    # Parameters initialization. (≈ 1 line of code)
-    ### START CODE HERE ###
-    network_obj = Network(layers_dims, seed=1, debug=True)
-    ### END CODE HERE ###
+    network_obj = Network(layers_dims, seed=seed, debug=False)
 
     # Loop (gradient descent)
     for i in range(0, num_iterations):
 
-        # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
-        ### START CODE HERE ### (≈ 1 line of code)
         AL, caches = network_obj.forward_propagation(X)
-        ### END CODE HERE ###
-
-        # Compute cost.
-        ### START CODE HERE ### (≈ 1 line of code)
         cost = network_obj.cost_cross_entropy(Y, AL)
-        ### END CODE HERE ###
 
-        # Backward propagation.
         grads = network_obj.backward_propagation(AL, Y, caches)
-        ### END CODE HERE ###
 
-        # Update parameters.
-        ### START CODE HERE ### (≈ 1 line of code)
         network_obj.update_parameters(gradients=grads, learning_rate=learning_rate)
-        ### END CODE HERE ###
 
         # Print the cost every 100 training example
         if print_cost and i % 100 == 0:
@@ -99,10 +82,29 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     plt.title("Learning rate =" + str(learning_rate))
     plt.show()
 
+    print(cost)
+    print(network_obj.weights)
+    print(network_obj.biases)
+
+def sklearn_MLP(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000):
+    classifier = MLPClassifier(hidden_layer_sizes=[2], solver="sgd", activation="logistic",
+                               learning_rate_init=learning_rate, max_iter=num_iterations, random_state=1, verbose=False)
+    X_T = X.T
+    Y_T = Y.T
+    print(X_T.shape, Y_T.shape)
+    classifier.fit(X_T, Y_T)
+    print(classifier.loss_)
+    print(classifier.out_activation_)
+    print(classifier.coefs_)
+    print(classifier.intercepts_)
+
 
 if __name__ == "__main__":
+    seed = 1
     raw_data = read_data("../data/iris.data")
     raw_data = convert_label_to_binary(raw_data, "Iris-setosa", label_col_index=4)
-    train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data)
+    train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data, seed=seed)
 
-    L_layer_model(train_data_x[:, :2], train_data_y[:, :2], [train_data_x.shape[0], 3, 2, 1], num_iterations=3, print_cost=True)
+    L_layer_model(train_data_x, train_data_y, [4, 2, 1], num_iterations=5, print_cost=True)
+    # sklearn_MLP(train_data_x, train_data_y, [4, 100, 1], num_iterations=2000)
+
