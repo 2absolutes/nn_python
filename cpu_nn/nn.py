@@ -7,7 +7,7 @@ import numpy as np
 # 3. Support different solvers (eg: adam, sgd, batch gd, etc)
 
 class Network(object):
-    UPDATE_FLAG = True
+    UPDATE_FLAG = False
 
     def __init__(self, sizes, seed=None, debug=False):
         """
@@ -31,6 +31,7 @@ class Network(object):
         self._debug = debug
 
         if self._debug:
+            print("\n\nInitialization Values")
             print("Layers: \n", sizes)
             print("\nWeights: \n\t length: {},\n\t values: \n\t {}".format(len(self.weights), self.weights))
             print("\nBiases: \n\t length: {},\n\t values: \n\t {}".format(len(self.biases), self.biases))
@@ -122,7 +123,9 @@ class Network(object):
         """
         a = x  # Assigning the input to "a" for reusability in the for loop below below
         caches = []
-        for l_weight, l_bias in zip(self.weights, self.biases):
+        for i_layer, (l_weight, l_bias) in enumerate(zip(self.weights, self.biases)):
+            if self._debug:
+                print("\n\nForward Propagation for Layer : {}".format(i_layer))
             a, cache = self._one_layer_forward_propagation(a, l_weight, l_bias)
             caches.append(cache)
 
@@ -228,6 +231,7 @@ class Network(object):
         l_cache = caches[hidden_layers - 1]
         l_da, l_dweight, l_dbias = self._one_layer_backward_propagation(da_last, l_cache)
         gradients[hidden_layers - 1] = (l_da, l_dweight, l_dbias)
+        # print("CHECKKKK: {}".format(gradients[hidden_layers-1][1]))
 
         for layer in reversed(range(hidden_layers - 1)):
             l_cache = caches[layer]
@@ -247,7 +251,7 @@ class Network(object):
         if self._debug or self.UPDATE_FLAG:
             old_weight, old_biases = np.array(self.weights), np.array(self.biases)
             print("\n---------\n\nOld Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
-            print("\nGrads:{}".format(gradients[1][1]))
+            self.__print_grads(gradients)
 
         for layer in range(hidden_layers):
             self.weights[layer] = self.weights[layer] - learning_rate * gradients[layer][1]
@@ -259,6 +263,17 @@ class Network(object):
         if self._debug or self.UPDATE_FLAG:
             print("\nUpdated by: \nweights:{}, \nbiases:{}".format(np.array(self.weights) - old_weight, np.array(self.biases - old_biases)))
 
+    @staticmethod
+    def __print_grads(gradients):
+        """
+        Used while debugging
+        :param gradients:
+        :return:
+        """
+        print("Grads:")
+        for layer, grad in enumerate(gradients):
+            print("dW {}: {}".format(layer, grad[1]))
+            print("db {}: {}".format(layer, grad[2]))
 
 if __name__ == "__main__":
     network_obj = Network(sizes=[4, 3, 2, 1], seed=0, debug=False)
@@ -357,6 +372,7 @@ if __name__ == "__main__":
     print(network_obj._one_layer_backward_propagation(dAL, linear_activation_cache))
 
     # ----- Check backward_propagation()
+    print("----- Check backward_propagation()")
 
     AL = np.array([[1.78862847, 0.43650985]])
     Y_assess = np.array([[1, 0]])
@@ -381,9 +397,10 @@ if __name__ == "__main__":
                 np.array([[-1.62328545]])),
                np.array([[0.64667545, -0.35627076]])))
 
-    print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[0][1])
+    print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[1][1])
 
     # ----- Check update_parameters()
+    print("----- Check update_parameters()")
 
     W = [np.array([[-0.41675785, -0.05626683, -2.1361961, 1.64027081],
                    [-1.79343559, -0.84174737, 0.50288142, -1.24528809],

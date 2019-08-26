@@ -2,13 +2,15 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+import math
 
 from cpu_nn.nn import Network
 from sklearn.neural_network import MLPClassifier
 
-def read_data(data_path):
+
+def read_data(data_path, header=None):
     # raw_data = np.genfromtxt(data_path, delimiter=',', dtype=None)
-    raw_data = pd.read_csv(data_path, header=None)
+    raw_data = pd.read_csv(data_path, header=header)
 
     return raw_data
 
@@ -38,7 +40,7 @@ def split_train_test(raw_data, train_fraction=0.8, seed=None):
     return train_data_x, train_data_y, test_data_x, test_data_y
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
+def L_layer_model(X, Y, layers_dims, learning_rate=0.000075, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -54,26 +56,34 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
 
-    np.random.seed(1)
+    np.random.seed(seed)
     costs = []  # keep track of cost
 
     network_obj = Network(layers_dims, seed=seed, debug=False)
 
     # Loop (gradient descent)
     for i in range(0, num_iterations):
+        if batch_size is None:
+            batch_size = X.shape[1]
+        for batch in range(math.ceil(X.shape[1]/batch_size)):
+            end = (batch + 1) * batch_size
+            if end > X.shape[1]:
+                end = X.shape[1]
+            X_batch = X[:, batch * batch_size: end]
+            Y_batch = Y[:, batch * batch_size: end]
 
-        AL, caches = network_obj.forward_propagation(X)
-        cost = network_obj.cost_cross_entropy(Y, AL)
+            AL, caches = network_obj.forward_propagation(X_batch)
+            cost = network_obj.cost_cross_entropy(Y_batch, AL)
 
-        grads = network_obj.backward_propagation(AL, Y, caches)
+            grads = network_obj.backward_propagation(AL, Y_batch, caches)
 
-        network_obj.update_parameters(gradients=grads, learning_rate=learning_rate)
+            network_obj.update_parameters(gradients=grads, learning_rate=learning_rate)
 
         # Print the cost every 100 training example
         if print_cost and i % 100 == 0:
             print("Cost after iteration %i: %f" % (i, cost))
-        if print_cost and i % 100 == 0:
-            costs.append(cost)
+        # if print_cost and i % 100 == 0:
+        costs.append(cost)
 
     # plot the cost
     plt.plot(np.squeeze(costs))
@@ -82,29 +92,52 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     plt.title("Learning rate =" + str(learning_rate))
     plt.show()
 
-    print(cost)
-    print(network_obj.weights)
-    print(network_obj.biases)
+    return network_obj
 
-def sklearn_MLP(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000):
-    classifier = MLPClassifier(hidden_layer_sizes=[2], solver="sgd", activation="logistic",
+def sklearn_MLP(X, Y, layers_dims, learning_rate=0.00075, num_iterations=3000):
+    classifier = MLPClassifier(hidden_layer_sizes=[2], solver="sgd", activation="relu",
                                learning_rate_init=learning_rate, max_iter=num_iterations, random_state=1, verbose=False)
     X_T = X.T
     Y_T = Y.T
     print(X_T.shape, Y_T.shape)
+    Y_T = np.ravel(Y_T)
+    print(X_T.shape, Y_T.shape)
+
     classifier.fit(X_T, Y_T)
     print(classifier.loss_)
     print(classifier.out_activation_)
     print(classifier.coefs_)
     print(classifier.intercepts_)
+    return classifier
 
 
 if __name__ == "__main__":
     seed = 1
-    raw_data = read_data("../data/iris.data")
-    raw_data = convert_label_to_binary(raw_data, "Iris-setosa", label_col_index=4)
+    # raw_data = read_data("../data/iris.data")
+    raw_data = read_data("../data/poker-hand-training-true.data", header=None)
+    print(raw_data[10].value_counts())
+    # primary_label = "Iris-setosa"
+    primary_label = 0
+
+    raw_data = convert_label_to_binary(raw_data, primary_label)
+    print(raw_data[10].value_counts())
+
+    # raw_data = read_data("../data/sinx.csv", header=0)
+    # raw_data.drop(raw_data.columns[[1,3,4]], axis=1, inplace=True)
+
+
     train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data, seed=seed)
 
-    L_layer_model(train_data_x, train_data_y, [4, 2, 1], num_iterations=5, print_cost=True)
-    # sklearn_MLP(train_data_x, train_data_y, [4, 100, 1], num_iterations=2000)
-
+    trained_model = L_layer_model(train_data_x, train_data_y, [10, 2, 1], num_iterations=2500, batch_size=None, print_cost=True, seed=1)
+    #
+    # y_hat, _ = trained_model.forward_propagation(test_data_x)
+    #
+    #
+    # trained_model = sklearn_MLP(train_data_x, train_data_y, [4, 100, 1], num_iterations=2000)
+    # y_hat = trained_model.predict(train_data_x.T)
+    # print(trained_model.score(test_data_x.T, test_data_y.T))
+    #
+    # print(y_hat.shape, test_data_y.shape)
+    # # print(y_hat > 0.5)
+    # print(y_hat[:, :10])
+    # print(train_data_y[:, :10])
