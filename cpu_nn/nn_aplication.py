@@ -40,7 +40,7 @@ def split_train_test(raw_data, train_fraction=0.8, seed=None):
     return train_data_x, train_data_y, test_data_x, test_data_y
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.000075, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
+def L_layer_model(X, Y, layers_dims, learning_rate=0.99, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -94,7 +94,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.000075, num_iterations=3000
 
     return network_obj
 
-def sklearn_MLP(X, Y, layers_dims, learning_rate=0.00075, num_iterations=3000):
+def sklearn_MLP(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000):
     classifier = MLPClassifier(hidden_layer_sizes=[2], solver="sgd", activation="relu",
                                learning_rate_init=learning_rate, max_iter=num_iterations, random_state=1, verbose=False)
     X_T = X.T
@@ -113,31 +113,32 @@ def sklearn_MLP(X, Y, layers_dims, learning_rate=0.00075, num_iterations=3000):
 
 if __name__ == "__main__":
     seed = 1
-    # raw_data = read_data("../data/iris.data")
-    raw_data = read_data("../data/poker-hand-training-true.data", header=None)
-    print(raw_data[10].value_counts())
-    # primary_label = "Iris-setosa"
-    primary_label = 0
+    raw_data = read_data("../data/iris.data")
+    primary_label = "Iris-setosa"
+
+    # raw_data = read_data("../data/poker-hand-training-true.data", header=None)
+    # print(raw_data[10].value_counts())
+    # primary_label = 0
 
     raw_data = convert_label_to_binary(raw_data, primary_label)
-    print(raw_data[10].value_counts())
 
     # raw_data = read_data("../data/sinx.csv", header=0)
     # raw_data.drop(raw_data.columns[[1,3,4]], axis=1, inplace=True)
 
-
     train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data, seed=seed)
 
-    trained_model = L_layer_model(train_data_x, train_data_y, [10, 2, 1], num_iterations=2500, batch_size=None, print_cost=True, seed=1)
+    feature_size = train_data_x.shape[0]
+    trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=100000, batch_size=None, print_cost=True, seed=1)
     #
-    # y_hat, _ = trained_model.forward_propagation(test_data_x)
-    #
+    y_hat, _ = trained_model.forward_propagation(test_data_x)
+    y_hat_binary = np.where(y_hat > 0.5, 1, 0)
     #
     # trained_model = sklearn_MLP(train_data_x, train_data_y, [4, 100, 1], num_iterations=2000)
     # y_hat = trained_model.predict(train_data_x.T)
     # print(trained_model.score(test_data_x.T, test_data_y.T))
     #
-    # print(y_hat.shape, test_data_y.shape)
-    # # print(y_hat > 0.5)
-    # print(y_hat[:, :10])
-    # print(train_data_y[:, :10])
+    print(y_hat_binary.shape, test_data_y.shape)
+    # print(y_hat > 0.5)
+    print(y_hat[:, :20])
+    print(y_hat_binary[:, :20])
+    print(train_data_y[:, :20])

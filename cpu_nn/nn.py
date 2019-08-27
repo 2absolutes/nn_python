@@ -224,7 +224,7 @@ class Network(object):
 
         if not da_last:
             if cost_function == "cross_entropy":
-                da_last = -1 * (np.divide(y, a_last) + np.divide(1 - y, 1 - a_last))
+                da_last = -1 * (np.divide(y, a_last) - np.divide(1 - y, 1 - a_last))
             else:
                 raise ValueError("{} cost function not supported".format(cost_function))
 
