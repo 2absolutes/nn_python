@@ -1,1 +1,1 @@
-# cpu_nn_python
+# nn_python
