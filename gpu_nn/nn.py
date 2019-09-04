@@ -1,7 +1,4 @@
 import numpy as np
-import pycuda.autoinit
-from pycuda import gpuarray
-from pycuda.compiler import SourceModule
 from gpu_nn import gpu_helper
 
 
@@ -77,7 +74,83 @@ class Network(object):
         :return: The result of applying the sigmoid function on z
         """
         exp_z = gpu_helper.element_wise_exponent(z)
-        a_denominator = gpu_helper.scalar_vector_addition(1.0, exp_z)
+        a_denominator = gpu_helper.scalar_matrix_addition(1.0, exp_z)
         a = gpu_helper.element_wise_reciprocal(a_denominator)
 
         return a
+
+    @staticmethod
+    def _activation_relu(z):
+        """
+        sigmoid activation function
+        :param z: linear part of the forward layer. Apply the sigmoid function on this.
+        :return: The result of applying the relu function on z
+        """
+        a = np.maximum(0, z)
+
+        return a
+
+    def _one_layer_forward_propagation(self, a_prev, l_weight, l_bias, activation="sigmoid"):
+        """
+        One pass of forward propagation across one layer. i.e g(wx = b) where g is the activation function
+        :param a_prev: activations from previous layer
+        :param l_weight: weight parameters of this layer
+        :param l_bias: bias parameters of this layer
+        :param activation: the activation function to use for this layer
+        :return: the activation from this layer
+        """
+        z, l_linear_cache = self._one_layer_linear_forward(a_prev, l_weight, l_bias)
+
+        # TODO: Support more activation functions.
+        if activation == "sigmoid":
+            a = self._activation_sigmoid(z)
+        elif activation == "relu":
+            a = self._activation_relu(z)
+        else:
+            raise ValueError("{} activation function is not supported!".format(activation))
+
+        if self._debug:
+            print(
+                "\nShapes:\nweights: {}, a_prev:{}, biases: {}, a:{}".format(l_weight.shape, a_prev.shape, l_bias.shape,
+                                                                             a.shape))
+            print("\nValues:\nweights: \n{}, \nbiases: \n{}, \nz: \n{}, \na: \n{}".format(l_weight, l_bias, z, a))
+
+        l_cache = (l_linear_cache, z)
+
+        return a, l_cache
+
+    def forward_propagation(self, x):
+        """
+        One pass of forward propagation across the network (all layers).
+        :param x: one batch of input data, shape: (input_size, num_of_samples)
+        :return: the final activation from the last layer
+
+        TODO: Support different activation functions for different layers
+        """
+        a = x  # Assigning the input to "a" for reusability in the for loop below below
+        caches = []
+        for i_layer, (l_weight, l_bias) in enumerate(zip(self.weights, self.biases)):
+            if self._debug:
+                print("\n\nForward Propagation for Layer : {}".format(i_layer))
+            a, cache = self._one_layer_forward_propagation(a, l_weight, l_bias)
+            caches.append(cache)
+
+        return a, caches
+
+    @staticmethod
+    def cost_cross_entropy(y, y_h):
+        """
+        Computes the cross entropy loss between the real and predicted values
+        :param y: real ("ground truth") values, shape (1, batch_size)
+        :param y_h: predicted values (as a result of the feedforward process), shape (1, batch_size)
+        :return: cross entropy loss
+        """
+
+        batch_size = y.shape[1]
+
+        cost = (-1 * 1 / batch_size) * sum(
+            [yi * np.log(y_hi) + (1 - yi) * np.log(1 - y_hi) for yi, y_hi in zip(y, y_h)][0])
+
+        cost = np.squeeze(cost)  # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
+
+        return cost
