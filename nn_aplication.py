@@ -4,7 +4,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import math
 
-from cpu_nn.nn import Network
+from cpu_nn.nn import Network as network_cpu
+from gpu_nn.nn import Network as network_gpu
 from sklearn.neural_network import MLPClassifier
 
 
@@ -40,7 +41,12 @@ def split_train_test(raw_data, train_fraction=0.8, seed=None):
     return train_data_x, train_data_y, test_data_x, test_data_y
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.99, num_iterations=3000, print_cost=False, batch_size=None, seed=None):
+def L_layer_model(X, Y,
+                  layers_dims, learning_rate=0.99,
+                  num_iterations=3000, batch_size=None,
+                  computation="cpu",
+                  print_cost=False,
+                  seed=None):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -59,6 +65,9 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.99, num_iterations=3000, pr
     np.random.seed(seed)
     costs = []  # keep track of cost
 
+    Network = network_cpu
+    if computation == "gpu":
+        Network = network_gpu
     network_obj = Network(layers_dims, seed=seed, debug=False)
 
     # Loop (gradient descent)
@@ -128,7 +137,10 @@ if __name__ == "__main__":
     train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data, seed=seed)
 
     feature_size = train_data_x.shape[0]
-    trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=100000, batch_size=None, print_cost=True, seed=1)
+    trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=10000,
+                                  batch_size=10,
+                                  computation="gpu",
+                                  print_cost=True, seed=1)
     #
     y_hat, _ = trained_model.forward_propagation(test_data_x)
     y_hat_binary = np.where(y_hat > 0.5, 1, 0)

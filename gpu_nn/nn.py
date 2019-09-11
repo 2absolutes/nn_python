@@ -26,10 +26,10 @@ class Network(object):
         self.sizes = sizes
         self.biases = []
         self.weights = []
+        self._debug = debug
 
         self._initialize_parameters()
 
-        self._debug = debug
 
         if self._debug:
             print("\n\nInitialization Values")
@@ -61,7 +61,7 @@ class Network(object):
         """
 
         wx = gpu_helper.matrix_multiplication(l_weight, a_prev)
-        z = gpu_helper.vector_vector_addition(wx, l_bias)
+        z = gpu_helper.matrix_matrix_addition(wx, l_bias)
         cache = (a_prev, l_weight, l_bias)
 
         return z, cache
@@ -74,6 +74,7 @@ class Network(object):
         :return: The result of applying the sigmoid function on z
         """
         exp_z = gpu_helper.element_wise_exponent(z)
+        negative_exp_z = gpu_helper.matrix_scalar_multiplication(scalar=-1, matrix=exp_z)
         a_denominator = gpu_helper.scalar_matrix_addition(1.0, exp_z)
         a = gpu_helper.element_wise_reciprocal(a_denominator)
 

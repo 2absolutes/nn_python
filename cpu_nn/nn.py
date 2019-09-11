@@ -26,9 +26,9 @@ class Network(object):
         self.biases = []
         self.weights = []
 
-        self._initialize_parameters()
-
         self._debug = debug
+
+        self._initialize_parameters()
 
         if self._debug:
             print("\n\nInitialization Values")
