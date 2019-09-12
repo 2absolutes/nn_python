@@ -122,7 +122,7 @@ def sklearn_MLP(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000):
 
 if __name__ == "__main__":
     seed = 1
-    raw_data = read_data("../data/iris.data")
+    raw_data = read_data("data/iris.data")
     primary_label = "Iris-setosa"
 
     # raw_data = read_data("../data/poker-hand-training-true.data", header=None)

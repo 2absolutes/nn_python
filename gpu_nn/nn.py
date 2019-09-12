@@ -61,7 +61,7 @@ class Network(object):
         """
 
         wx = gpu_helper.matrix_multiplication(l_weight, a_prev)
-        z = gpu_helper.matrix_matrix_addition(wx, l_bias)
+        z = gpu_helper.vector_matrix_addition(wx, l_bias)
         cache = (a_prev, l_weight, l_bias)
 
         return z, cache

@@ -1,4 +1,4 @@
-__global__ void matadd(const float *matrix1, const float *matrix2, float *out_matrix, int nrows, int ncols, int debug)
+__global__ void matrix_addition(const float *matrix1, const float *matrix2, float *out_matrix, int nrows, int ncols, int debug)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;

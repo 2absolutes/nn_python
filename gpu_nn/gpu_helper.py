@@ -7,6 +7,7 @@ TODO: Severe inefficiency suspected while copying to device and back for each st
 """
 
 import os
+import math
 import numpy as np
 import pycuda.autoinit
 from pycuda import driver
@@ -40,7 +41,7 @@ def matrix_multiplication(matrix1, matrix2):
     driver.memcpy_htod(matrix1_gpu, matrix1)
     driver.memcpy_htod(matrix2_gpu, matrix1)
     print(f"CWD: {os.getcwd()}")
-    ker_code = SourceModule(open("../gpu_nn/kernels/matrix_multiplication.c", 'r').read())
+    ker_code = SourceModule(open("gpu_nn/kernels/matrix_multiplication.c", 'r').read())
 
     matmul = ker_code.get_function("matmul")
 
@@ -63,11 +64,11 @@ def scalar_matrix_addition(scalar, matrix):
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    ker_code = SourceModule(open("./kernels/scalar_matrix_addition.c", 'r').read())
+    ker_code = SourceModule(open("gpu_nn/kernels/scalar_matrix_addition.c", 'r').read())
 
     scalar_matrix_add = ker_code.get_function("scalar_matrix_add")
 
-    scalar_matrix_add(scalar, matrix_gpu, output_matrix_gpu,
+    scalar_matrix_add(np.float32(scalar), matrix_gpu, output_matrix_gpu,
                       np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
                       np.int32(0),
                       block=BLOCK_DIMS,
@@ -89,7 +90,6 @@ def matrix_matrix_addition(matrix1, matrix2):
 
     output_matrix = np.empty(matrix1.shape).astype(np.float32)
 
-
     matrix1_gpu = driver.mem_alloc(matrix1.nbytes)
     matrix2_gpu = driver.mem_alloc(matrix2.nbytes)
     output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
@@ -99,7 +99,7 @@ def matrix_matrix_addition(matrix1, matrix2):
 
     ker_code = SourceModule(open("./kernels/matrix_addition.c", 'r').read())
 
-    matadd = ker_code.get_function("matadd")
+    matadd = ker_code.get_function("matrix_addition")
 
     matadd(matrix1_gpu, matrix2_gpu, output_matrix_gpu,
            np.int32(matrix1.shape[0]), np.int32(matrix1.shape[1]),
@@ -112,34 +112,68 @@ def matrix_matrix_addition(matrix1, matrix2):
     return output_matrix
 
 
+def vector_matrix_addition(matrix, vector):
+    """
+    Addition of a vector and a matrix. Vector is broadcasted.
+    :param matrix:
+    :param vector:
+    :return:
+    """
+
+    if vector.shape[0] == 1:
+        broadcast_dimension = 0
+    elif vector.shape[1] == 1:
+        broadcast_dimension = 1
+    else:
+        raise ValueError("Vector is not broadcastable. {} != {}".format(matrix.shape, vector.shape))
+
+    output_matrix = np.empty(matrix.shape).astype(np.float32)
+
+    matrix_gpu = driver.mem_alloc(matrix.nbytes)
+    vector_gpu = driver.mem_alloc(vector.nbytes)
+    output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
+
+    driver.memcpy_htod(matrix_gpu, matrix)
+    driver.memcpy_htod(vector_gpu, vector)
+
+    ker_code = SourceModule(open("gpu_nn/kernels/vector_matrix_addition.c", 'r').read())
+
+    vector_matrix_add = ker_code.get_function("vector_matrix_addition")
+
+    vector_matrix_add(matrix_gpu, vector_gpu, output_matrix_gpu,
+                      np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
+                      np.int32(broadcast_dimension),
+                      np.int32(0),
+                      block=BLOCK_DIMS,
+                      grid=GRID_DIMS)
+
+    driver.memcpy_dtoh(output_matrix, output_matrix_gpu)
+
+    return output_matrix
+
+
 def matrix_scalar_multiplication(scalar, matrix):
     output_matrix_cpu = np.empty(matrix.shape).astype(np.float32)
-
-    print(matrix, scalar)
-    numpy_answer_cpu = np.multiply(scalar, matrix)
 
     matrix_gpu = driver.mem_alloc(matrix.nbytes)
     output_matrix_gpu = driver.mem_alloc(output_matrix_cpu.nbytes)
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    print(matrix.shape)
-    print(output_matrix_cpu.shape)
-
-    ker_code = SourceModule(open("./kernels/matrix_scalar_multiplication.c", 'r').read())
+    ker_code = SourceModule(open("gpu_nn/kernels/matrix_scalar_multiplication.c", 'r').read())
 
     matrix_scalar_multiply = ker_code.get_function("matrix_scalar_multiplication")
 
-    matrix_scalar_multiply(matrix_gpu, scalar, output_matrix_gpu,
-                                 np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
-                                 np.int32(1),
-                                 block=BLOCK_DIMS,
-                                 grid=GRID_DIMS)
+    matrix_scalar_multiply(matrix_gpu, np.float32(scalar), output_matrix_gpu,
+                           np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
+                           np.int32(0),
+                           block=BLOCK_DIMS,
+                           grid=GRID_DIMS)
 
     driver.memcpy_dtoh(output_matrix_cpu, output_matrix_gpu)
 
 
-def element_wise_exponent(matrix, base="e"):
+def element_wise_exponent(matrix, base=math.e):
     """
     Takes each element of the matrix and does base^element
     :param matrix:
@@ -153,13 +187,13 @@ def element_wise_exponent(matrix, base="e"):
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    ker_code = SourceModule(open("./kernels/exponent_matrix.c", 'r').read())
+    ker_code = SourceModule(open("gpu_nn/kernels/exponent_matrix.c", 'r').read())
 
     exponent_matrix = ker_code.get_function("exponent_matrix")
 
-    exponent_matrix(base, matrix_gpu, output_matrix_gpu,
+    exponent_matrix(np.float32(base), matrix_gpu, output_matrix_gpu,
                     np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
-                    np.int32(1),
+                    np.int32(0),
                     block=BLOCK_DIMS,
                     grid=GRID_DIMS)
 
@@ -182,13 +216,13 @@ def element_wise_reciprocal(matrix, numerator=1.0):
     print(matrix.shape)
     print(output_matrix_cpu.shape)
 
-    ker_code = SourceModule(open("./kernels/matrix_reciprocal.c", 'r').read())
+    ker_code = SourceModule(open("gpu_nn/kernels/matrix_reciprocal.c", 'r').read())
 
     matrix_reciprocal = ker_code.get_function("matrix_reciprocal")
 
-    matrix_reciprocal(numerator, matrix_gpu, output_matrix_gpu,
+    matrix_reciprocal(np.float32(numerator), matrix_gpu, output_matrix_gpu,
                       np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
-                      np.int32(1),
+                      np.int32(0),
                       block=BLOCK_DIMS,
                       grid=GRID_DIMS)
 

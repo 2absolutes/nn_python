@@ -253,10 +253,59 @@ def test_matrix_scalar_multiplication():
     print("CPU: \n", numpy_answer_cpu)
 
 
+def test_vector_matrix_addition():
+
+    np.random.seed(124)
+    max_dim = 10
+
+    nrows = np.int32(np.random.randint(max_dim))
+    ncols = np.int32(np.random.randint(max_dim))
+
+    matrix_cpu = (np.random.randn(nrows, ncols) * 1).astype(np.float32)
+    vector_cpu = (np.random.randn(nrows, 1) * 1).astype(np.float32)
+    vector_row_cpu = (np.random.randn(nrows, 1) * 1).astype(np.float32)
+
+    output_matrix_cpu = np.empty(matrix_cpu.shape).astype(np.float32)
+
+    print(matrix_cpu, vector_cpu, vector_row_cpu)
+    numpy_answer_cpu = np.add(vector_cpu, matrix_cpu)
+
+    if vector_cpu.shape[0] == 1:
+        broadcast_dimension = 0
+    elif vector_cpu.shape[1] == 1:
+        broadcast_dimension = 1
+    else:
+        raise ValueError("Vector is not broadcastable. {} != {}".format(matrix_cpu.shape, vector_cpu.shape))
+
+    matrix_gpu = cuda.mem_alloc(matrix_cpu.nbytes)
+    vector_gpu = cuda.mem_alloc(vector_cpu.nbytes)
+    output_matrix_gpu = cuda.mem_alloc(output_matrix_cpu.nbytes)
+
+    cuda.memcpy_htod(matrix_gpu, matrix_cpu)
+    cuda.memcpy_htod(vector_gpu, vector_cpu)
+
+    ker_code = SourceModule(open("./kernels/vector_matrix_addition.c", 'r').read())
+
+    vector_matrix_add = ker_code.get_function("vector_matrix_addition")
+
+    vector_matrix_add(matrix_gpu, vector_gpu, output_matrix_gpu,
+                      np.int32(matrix_cpu.shape[0]), np.int32(matrix_cpu.shape[1]),
+                      np.int32(broadcast_dimension),
+                      np.int32(0),
+                      block=(16, 16, 1),
+                      grid=(1, 1, 1))
+
+    cuda.memcpy_dtoh(output_matrix_cpu, output_matrix_gpu)
+
+    print("\n\nGPU: \n", output_matrix_cpu, "\n\n")
+    print("CPU: \n", numpy_answer_cpu)
+
+
 if __name__ == "__main__":
     # test_matmul()
     # test_matadd()
     # test_scalar_matrix_add()
     # test_exponent_matrix()
     # test_matrix_reciprocal()
-    test_matrix_scalar_multiplication()
+    # test_matrix_scalar_multiplication()
+    test_vector_matrix_addition()
