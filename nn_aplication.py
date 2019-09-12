@@ -72,6 +72,7 @@ def L_layer_model(X, Y,
 
     # Loop (gradient descent)
     for i in range(0, num_iterations):
+        print("Epoch {}--------------------".format(i))
         if batch_size is None:
             batch_size = X.shape[1]
         for batch in range(math.ceil(X.shape[1]/batch_size)):
@@ -89,7 +90,7 @@ def L_layer_model(X, Y,
             network_obj.update_parameters(gradients=grads, learning_rate=learning_rate)
 
         # Print the cost every 100 training example
-        if print_cost and i % 100 == 0:
+        if print_cost and i % 1 == 0:
             print("Cost after iteration %i: %f" % (i, cost))
         # if print_cost and i % 100 == 0:
         costs.append(cost)
@@ -137,9 +138,9 @@ if __name__ == "__main__":
     train_data_x, train_data_y, test_data_x, test_data_y = split_train_test(raw_data, seed=seed)
 
     feature_size = train_data_x.shape[0]
-    trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=10000,
+    trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=10,
                                   batch_size=10,
-                                  computation="gpu",
+                                  computation="cpu",
                                   print_cost=True, seed=1)
     #
     y_hat, _ = trained_model.forward_propagation(test_data_x)

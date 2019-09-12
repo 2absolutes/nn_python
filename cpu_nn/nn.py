@@ -279,6 +279,7 @@ if __name__ == "__main__":
     network_obj = Network(sizes=[4, 3, 2, 1], seed=0, debug=False)
 
     # ----- Check _one_layer_linear_forward()
+    print("----- Check _one_layer_linear_forward()")
 
     W = np.array([[1.74481176, -0.7612069, 0.3190391]])
     A = np.array([[1.62434536, -0.61175641],
@@ -289,6 +290,7 @@ if __name__ == "__main__":
     print(network_obj._one_layer_linear_forward(A, W, b)[0])
 
     # ----- Check _one_layer_forward_propagation()
+    print("----- Check _one_layer_forward_propagation()")
 
     A_prev = np.array([[-0.41675785, -0.05626683],
                        [-2.1361961, 1.64027081],
@@ -300,6 +302,7 @@ if __name__ == "__main__":
     print(network_obj._one_layer_forward_propagation(A_prev, W, b, activation="sigmoid")[0])
 
     # ----- Check _one_layer_forward_propagation()
+    print("----- Check _one_layer_forward_propagation()")
     X = np.array([[-0.31178367, 0.72900392, 0.21782079, -0.8990918],
                   [-2.48678065, 0.91325152, 1.12706373, -1.51409323],
                   [1.63929108, -0.4298936, 2.63128056, 0.60182225],
@@ -332,6 +335,7 @@ if __name__ == "__main__":
     print(network_obj.forward_propagation(X)[0])
 
     # ----- Check cost_cross_entropy()
+    print("----- Check cost_cross_entropy()")
     y = np.array([[1, 1, 1]])
     y_h = np.array([[0.8, 0.9, 0.4]])
 
@@ -355,6 +359,7 @@ if __name__ == "__main__":
     print(network_obj._one_layer_linear_backward(dz=dZ, cache=linear_cache))
 
     # ----- Check _one_layer_backward_propagation()
+    print("----- Check _one_layer_backward_propagation()")
 
     dAL = [[-0.41675785, -0.05626683]]
     linear_activation_cache = ((np.array([[-2.1361961, 1.64027081],

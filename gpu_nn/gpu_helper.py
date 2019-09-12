@@ -7,6 +7,7 @@ TODO: Severe inefficiency suspected while copying to device and back for each st
 """
 
 import os
+import sys
 import math
 import numpy as np
 import pycuda.autoinit
@@ -16,8 +17,12 @@ from pycuda.compiler import SourceModule
 BLOCK_DIMS = (32, 32, 1)
 GRID_DIMS = (1, 1, 1)
 
+DIR_PATH = os.path.realpath("..")
+sys.path.append(DIR_PATH)
+print("dir vdswv", DIR_PATH)
 
-def matrix_multiplication(matrix1, matrix2):
+
+def matrix_multiplication(matrix1, matrix2, debug=0):
     """
 
     :param matrix1:
@@ -34,21 +39,24 @@ def matrix_multiplication(matrix1, matrix2):
 
     output_matrix = np.empty((matrix1_nrows, matrix2_ncols)).astype(np.float32)
 
+    print(f"Matrix1: {matrix1}, Matrix2: {matrix2}")
+
     matrix1_gpu = driver.mem_alloc(matrix1.nbytes)
     matrix2_gpu = driver.mem_alloc(matrix2.nbytes)
     output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
 
     driver.memcpy_htod(matrix1_gpu, matrix1)
     driver.memcpy_htod(matrix2_gpu, matrix1)
-    print(f"CWD: {os.getcwd()}")
-    ker_code = SourceModule(open("gpu_nn/kernels/matrix_multiplication.c", 'r').read())
+
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_multiplication.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     matmul = ker_code.get_function("matmul")
 
     matmul(matrix1_gpu, matrix2_gpu, output_matrix_gpu,
            matrix1_nrows, matrix1_ncols,
            matrix2_nrows, matrix2_ncols,
-           np.int32(0),
+           np.int32(debug),
            block=BLOCK_DIMS,
            grid=GRID_DIMS)
 
@@ -56,7 +64,7 @@ def matrix_multiplication(matrix1, matrix2):
     return output_matrix
 
 
-def scalar_matrix_addition(scalar, matrix):
+def scalar_matrix_addition(scalar, matrix, debug=0):
     output_matrix_cpu = np.empty(matrix.shape).astype(np.float32)
 
     matrix_gpu = driver.mem_alloc(matrix.nbytes)
@@ -64,13 +72,14 @@ def scalar_matrix_addition(scalar, matrix):
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    ker_code = SourceModule(open("gpu_nn/kernels/scalar_matrix_addition.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/scalar_matrix_addition.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     scalar_matrix_add = ker_code.get_function("scalar_matrix_add")
 
     scalar_matrix_add(np.float32(scalar), matrix_gpu, output_matrix_gpu,
                       np.int32(matrix.shape[0]), np.int32(matrix.shape[1]),
-                      np.int32(0),
+                      np.int32(debug),
                       block=BLOCK_DIMS,
                       grid=GRID_DIMS)
 
@@ -97,7 +106,8 @@ def matrix_matrix_addition(matrix1, matrix2):
     driver.memcpy_htod(matrix1_gpu, matrix1)
     driver.memcpy_htod(matrix2_gpu, matrix2)
 
-    ker_code = SourceModule(open("./kernels/matrix_addition.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_addition.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     matadd = ker_code.get_function("matrix_addition")
 
@@ -112,7 +122,7 @@ def matrix_matrix_addition(matrix1, matrix2):
     return output_matrix
 
 
-def vector_matrix_addition(matrix, vector):
+def vector_matrix_addition(vector, matrix):
     """
     Addition of a vector and a matrix. Vector is broadcasted.
     :param matrix:
@@ -136,7 +146,8 @@ def vector_matrix_addition(matrix, vector):
     driver.memcpy_htod(matrix_gpu, matrix)
     driver.memcpy_htod(vector_gpu, vector)
 
-    ker_code = SourceModule(open("gpu_nn/kernels/vector_matrix_addition.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/vector_matrix_addition.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     vector_matrix_add = ker_code.get_function("vector_matrix_addition")
 
@@ -152,7 +163,7 @@ def vector_matrix_addition(matrix, vector):
     return output_matrix
 
 
-def matrix_scalar_multiplication(scalar, matrix):
+def scalar_matrix_multiplication(scalar, matrix):
     """
 
     :param scalar:
@@ -166,7 +177,8 @@ def matrix_scalar_multiplication(scalar, matrix):
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    ker_code = SourceModule(open("gpu_nn/kernels/matrix_scalar_multiplication.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_scalar_multiplication.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     matrix_scalar_multiply = ker_code.get_function("matrix_scalar_multiplication")
 
@@ -194,7 +206,8 @@ def element_wise_exponent(matrix, base=math.e):
 
     driver.memcpy_htod(matrix_gpu, matrix)
 
-    ker_code = SourceModule(open("gpu_nn/kernels/exponent_matrix.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/exponent_matrix.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     exponent_matrix = ker_code.get_function("exponent_matrix")
 
@@ -212,18 +225,14 @@ def element_wise_exponent(matrix, base=math.e):
 def element_wise_reciprocal(matrix, numerator=1.0):
     output_matrix_cpu = np.empty(matrix.shape).astype(np.float32)
 
-    print(matrix, numerator)
     numpy_answer_cpu = np.divide(numerator, matrix)
 
     matrix_gpu = driver.mem_alloc(matrix.nbytes)
     output_matrix_gpu = driver.mem_alloc(output_matrix_cpu.nbytes)
 
     driver.memcpy_htod(matrix_gpu, matrix)
-
-    print(matrix.shape)
-    print(output_matrix_cpu.shape)
-
-    ker_code = SourceModule(open("gpu_nn/kernels/matrix_reciprocal.c", 'r').read())
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_reciprocal.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
 
     matrix_reciprocal = ker_code.get_function("matrix_reciprocal")
 
@@ -245,3 +254,102 @@ def cross_entropy(vector1, vector2):
     :return:
     """
     pass
+
+
+def matrix_element_multiplication(matrix1, matrix2):
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("Cannot perform addition. Shapes don't match. {} != {}".format(matrix1.shape, matrix2.shape))
+
+    output_matrix = np.empty(matrix1.shape).astype(np.float32)
+
+    matrix1_gpu = driver.mem_alloc(matrix1.nbytes)
+    matrix2_gpu = driver.mem_alloc(matrix2.nbytes)
+    output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
+
+    driver.memcpy_htod(matrix1_gpu, matrix1)
+    driver.memcpy_htod(matrix2_gpu, matrix2)
+
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_element_multiplication.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
+
+    matrix_element_multiply = ker_code.get_function("matrix_element_multiplication")
+
+    matrix_element_multiply(matrix1_gpu, matrix2_gpu, output_matrix_gpu,
+           np.int32(matrix1.shape[0]), np.int32(matrix1.shape[1]),
+           np.int32(0),
+           block=BLOCK_DIMS,
+           grid=GRID_DIMS)
+
+    driver.memcpy_dtoh(output_matrix, output_matrix_gpu)
+
+    return output_matrix
+
+
+def matrix_subtraction(matrix1, matrix2):
+    """
+        Addition of 2 2d matrices
+        :param matrix1:
+        :param matrix2:
+        :return:
+        """
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("Cannot perform addition. Shapes don't match. {} != {}".format(matrix1.shape, matrix2.shape))
+
+    output_matrix = np.empty(matrix1.shape).astype(np.float32)
+
+    matrix1_gpu = driver.mem_alloc(matrix1.nbytes)
+    matrix2_gpu = driver.mem_alloc(matrix2.nbytes)
+    output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
+
+    driver.memcpy_htod(matrix1_gpu, matrix1)
+    driver.memcpy_htod(matrix2_gpu, matrix2)
+
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_subtraction.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
+
+    matrix_subtract = ker_code.get_function("matrix_subtraction")
+
+    matrix_subtract(matrix1_gpu, matrix2_gpu, output_matrix_gpu,
+                    np.int32(matrix1.shape[0]), np.int32(matrix1.shape[1]),
+                    np.int32(0),
+                    block=BLOCK_DIMS,
+                    grid=GRID_DIMS)
+
+    driver.memcpy_dtoh(output_matrix, output_matrix_gpu)
+
+    return output_matrix
+
+
+def matrix_element_division(matrix1, matrix2):
+    """
+        Division of 2 2d matrices
+        :param matrix1:
+        :param matrix2:
+        :return:
+        """
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("Cannot perform addition. Shapes don't match. {} != {}".format(matrix1.shape, matrix2.shape))
+
+    output_matrix = np.empty(matrix1.shape).astype(np.float32)
+
+    matrix1_gpu = driver.mem_alloc(matrix1.nbytes)
+    matrix2_gpu = driver.mem_alloc(matrix2.nbytes)
+    output_matrix_gpu = driver.mem_alloc(output_matrix.nbytes)
+
+    driver.memcpy_htod(matrix1_gpu, matrix1)
+    driver.memcpy_htod(matrix2_gpu, matrix2)
+
+    kernel_file = os.path.join(DIR_PATH, "gpu_nn/kernels/matrix_element_division.c")
+    ker_code = SourceModule(open(kernel_file, 'r').read())
+
+    matrix_subtract = ker_code.get_function("matrix_element_division")
+
+    matrix_subtract(matrix1_gpu, matrix2_gpu, output_matrix_gpu,
+                    np.int32(matrix1.shape[0]), np.int32(matrix1.shape[1]),
+                    np.int32(0),
+                    block=BLOCK_DIMS,
+                    grid=GRID_DIMS)
+
+    driver.memcpy_dtoh(output_matrix, output_matrix_gpu)
+
+    return output_matrix
