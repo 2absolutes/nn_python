@@ -153,6 +153,12 @@ def vector_matrix_addition(matrix, vector):
 
 
 def matrix_scalar_multiplication(scalar, matrix):
+    """
+
+    :param scalar:
+    :param matrix:
+    :return:
+    """
     output_matrix_cpu = np.empty(matrix.shape).astype(np.float32)
 
     matrix_gpu = driver.mem_alloc(matrix.nbytes)
@@ -171,6 +177,7 @@ def matrix_scalar_multiplication(scalar, matrix):
                            grid=GRID_DIMS)
 
     driver.memcpy_dtoh(output_matrix_cpu, output_matrix_gpu)
+    return output_matrix_cpu
 
 
 def element_wise_exponent(matrix, base=math.e):
@@ -227,6 +234,7 @@ def element_wise_reciprocal(matrix, numerator=1.0):
                       grid=GRID_DIMS)
 
     driver.memcpy_dtoh(output_matrix_cpu, output_matrix_gpu)
+    return output_matrix_cpu
 
 
 def cross_entropy(vector1, vector2):
