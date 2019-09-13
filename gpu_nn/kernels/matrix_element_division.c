@@ -14,6 +14,6 @@ __global__ void matrix_element_division(const float *matrix1, const float *matri
         out_matrix[index] = matrix1[index] / matrix2[index];
 
         if(debug)
-            printf("Row: %d, Column: %d, Cell_sum: %f, index: %d\n", row, col, out_matrix[index], index);
+            printf("Row: %d, Column: %d, Cell_output: %f, index: %d\n", row, col, out_matrix[index], index);
     }
 }

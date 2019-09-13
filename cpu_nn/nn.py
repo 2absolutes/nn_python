@@ -361,7 +361,7 @@ if __name__ == "__main__":
     # ----- Check _one_layer_backward_propagation()
     print("----- Check _one_layer_backward_propagation()")
 
-    dAL = [[-0.41675785, -0.05626683]]
+    dAL = np.array([[-0.41675785, -0.05626683]])
     linear_activation_cache = ((np.array([[-2.1361961, 1.64027081],
                                           [-1.79343559, -0.84174737],
                                           [0.50288142, -1.24528809]]),
@@ -402,6 +402,8 @@ if __name__ == "__main__":
                 np.array([[-1.62328545]])),
                np.array([[0.64667545, -0.35627076]])))
 
+    expected_result = [[-0.39202432 -0.13325855 -0.04601089]]
+
     print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[1][1])
 
     # ----- Check update_parameters()
@@ -429,4 +431,15 @@ if __name__ == "__main__":
     network_obj.weights = W
     network_obj.biases = b
     network_obj.update_parameters(grads, 0.1)
+
+    """
+     Expected Result:
+        W:[array([[-0.5956207 , -0.09991781, -2.14584585,  1.82662008],
+       [-1.76569677, -0.80627147,  0.51115557, -1.18258802],
+       [-1.0535704 , -0.86128581,  0.68284051,  2.20374577]]), array([[-0.55569196,  0.0354055 ,  1.32964895]])], 
+        b:[array([[-0.04659241],
+       [-1.28888276],
+       [ 0.53405496]]), array([[-0.84610769]])]
+
+    """
     print("\n\nW:{}, \nb:{}".format(network_obj.weights, network_obj.biases))

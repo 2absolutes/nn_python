@@ -68,7 +68,7 @@ def L_layer_model(X, Y,
     Network = network_cpu
     if computation == "gpu":
         Network = network_gpu
-    network_obj = Network(layers_dims, seed=seed, debug=False)
+    network_obj = Network(layers_dims, seed=seed, debug=0)
 
     # Loop (gradient descent)
     for i in range(0, num_iterations):

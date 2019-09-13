@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import sys
+
 DIR_PATH = os.path.realpath("..")
 sys.path.append(DIR_PATH)
 print("dir", DIR_PATH)
@@ -64,11 +65,9 @@ class Network(object):
         :return: (l_weight * a) + l_bias, cache (components used to calculate z for this layer)
         """
 
-        wx = gpu_helper.matrix_multiplication(l_weight, a_prev, debug=1)
+        wx = gpu_helper.matrix_multiplication(l_weight, a_prev)
         z = gpu_helper.vector_matrix_addition(vector=l_bias, matrix=wx)
         cache = (a_prev, l_weight, l_bias)
-
-        print(f"wx:{wx}, b:{b}")
 
         return z, cache
 
@@ -79,8 +78,8 @@ class Network(object):
         :param z: linear part of the forward layer. Apply the sigmoid function on this.
         :return: The result of applying the sigmoid function on z
         """
-        exp_z = gpu_helper.element_wise_exponent(z)
-        negative_exp_z = gpu_helper.scalar_matrix_multiplication(scalar=-1, matrix=exp_z)
+        negative_z = gpu_helper.scalar_matrix_multiplication(scalar=-1, matrix=z)
+        exp_z = gpu_helper.element_wise_exponent(negative_z)
         a_denominator = gpu_helper.scalar_matrix_addition(1.0, exp_z)
         a = gpu_helper.element_wise_reciprocal(a_denominator)
 
@@ -176,14 +175,14 @@ class Network(object):
         a_prev, l_weight, l_bias = cache
         batch_size = a_prev.shape[1]  # since the batch size is not explicitly store anywhere, we can get it like this
 
-        # print("Check: m:{}, a_prev:{}, dz:{}, l_weight:{}, l_bias:{}".format(batch_size, a_prev, dz, l_weight, l_bias))
+        # numpy transpose does not actually change the memory layout. This causes problems with indexing in C.
+        # The explicit copy ensures the memory layout is changed too.
+        da_prev = gpu_helper.matrix_multiplication(l_weight.T.copy(order='C'), dz)
 
-        dw = gpu_helper.scalar_matrix_multiplication((1 / batch_size), gpu_helper.matrix_multiplication(dz, a_prev.T))
-
+        dw = gpu_helper.scalar_matrix_multiplication(1.0 / batch_size,
+                                                     gpu_helper.matrix_multiplication(dz, a_prev.T.copy(order='C')))
         # TODO: GPU candidate
         db = (1 / batch_size) * np.sum(dz, axis=1, keepdims=True)
-
-        da_prev = gpu_helper.matrix_multiplication(l_weight.T, dz)
 
         return da_prev, dw, db
 
@@ -228,16 +227,17 @@ class Network(object):
         """
         hidden_layers = len(caches)
         gradients = [None] * hidden_layers
-        batch_size = a_last.shape[1]
-        y = y.reshape(a_last.shape)  # Just to make sure shapes of both a and y match
+        y = y.reshape(a_last.shape)  # To make sure a.shape == y.shape match, in case of column-wise vs row-wise vectors
 
         if not da_last:
             if cost_function == "cross_entropy":
-                da_last = gpu_helper.scalar_matrix_multiplication(-1,
-                                                                  gpu_helper.matrix_subtraction(
-                                                                      gpu_helper.matrix_element_division(y, a_last),
-                                                                      gpu_helper.matrix_element_division(1 - y,
-                                                                                                         1 - a_last)))
+                da_last = gpu_helper.scalar_matrix_multiplication(
+                    -1,
+                    gpu_helper.matrix_subtraction(
+                        gpu_helper.matrix_element_division(y, a_last),
+                        gpu_helper.matrix_element_division(1 - y,
+                                                           1 - a_last)))
+
             else:
                 raise ValueError("{} cost function not supported".format(cost_function))
 
@@ -281,14 +281,21 @@ class Network(object):
             self.__print_grads(gradients)
 
         for layer in range(hidden_layers):
-            self.weights[layer] = gpu_helper.matrix_subtraction(self.weights[layer], gpu_helper.scalar_matrix_multiplication(learning_rate, gradients[layer][1]))
-            self.biases[layer] = gpu_helper.matrix_subtraction(self.biases[layer], gpu_helper.scalar_matrix_multiplication(learning_rate, gradients[layer][2]))
+            self.weights[layer] = gpu_helper.matrix_subtraction(self.weights[layer],
+                                                                gpu_helper.scalar_matrix_multiplication(learning_rate,
+                                                                                                        gradients[
+                                                                                                            layer][1]))
+            self.biases[layer] = gpu_helper.matrix_subtraction(self.biases[layer],
+                                                               gpu_helper.scalar_matrix_multiplication(learning_rate,
+                                                                                                       gradients[layer][
+                                                                                                           2]))
 
         if self._debug >= 2:
             print("\nNew Values: \nweights:{}, \nbiases:{}".format(self.weights, self.biases))
 
         if self._debug >= 3:
-            print("\nUpdated by: \nweights:{}, \nbiases:{}".format(np.array(self.weights) - old_weight, np.array(self.biases - old_biases)))
+            print("\nUpdated by: \nweights:{}, \nbiases:{}".format(np.array(self.weights) - old_weight,
+                                                                   np.array(self.biases - old_biases)))
 
         if self._debug >= 1:
             print("Parameters Updated")
@@ -306,149 +313,161 @@ if __name__ == "__main__":
                   [0.86540763, -2.3015387]])
     b = np.array([[-0.24937038]])
     expected_result = [[3.26295336, -1.23429988]]
-    print(f"W.shape: {W.shape},  A.shape:{A.shape}")
-    print(f"A: {A},\nW: {W},\n b:{b}")
-    print("CEHCK, wx: {}, b:{}".format(np.matmul(W, A), b))
+
     print(network_obj._one_layer_linear_forward(A, W, b)[0])
 
-    # # ----- Check _one_layer_forward_propagation()
-    # print("----- Check _one_layer_forward_propagation()")
+    # ----- Check _one_layer_forward_propagation()
+    print("----- Check _one_layer_forward_propagation()")
+
+    A_prev = np.array([[-0.41675785, -0.05626683],
+                       [-2.1361961, 1.64027081],
+                       [-1.79343559, -0.84174737]])
+    W = np.array([[0.50288142, -1.24528809, -1.05795222]])
+    b = np.array([[-0.90900761]])
+
+    expected_result = [[0.96890023, 0.11013289]]
+    print(network_obj._one_layer_forward_propagation(A_prev, W, b, activation="sigmoid")[0])
     #
-    # A_prev = np.array([[-0.41675785, -0.05626683],
-    #                    [-2.1361961, 1.64027081],
-    #                    [-1.79343559, -0.84174737]])
-    # W = np.array([[0.50288142, -1.24528809, -1.05795222]])
-    # b = np.array([[-0.90900761]])
-    #
-    # expected_result = [[0.96890023, 0.11013289]]
-    # print(network_obj._one_layer_forward_propagation(A_prev, W, b, activation="sigmoid")[0])
-    #
-    # # ----- Check _one_layer_forward_propagation()
-    # print("----- Check _one_layer_forward_propagation()")
-    # X = np.array([[-0.31178367, 0.72900392, 0.21782079, -0.8990918],
-    #               [-2.48678065, 0.91325152, 1.12706373, -1.51409323],
-    #               [1.63929108, -0.4298936, 2.63128056, 0.60182225],
-    #               [-0.33588161, 1.23773784, 0.11112817, 0.12915125],
-    #               [0.07612761, -0.15512816, 0.63422534, 0.810655]])
-    #
-    # W = [np.array([[0.35480861, 1.81259031, -1.3564758, -0.46363197, 0.82465384],
-    #                [-1.17643148, 1.56448966, 0.71270509, -0.1810066, 0.53419953],
-    #                [-0.58661296, -1.48185327, 0.85724762, 0.94309899, 0.11444143],
-    #                [-0.02195668, -2.12714455, -0.83440747, -0.46550831, 0.23371059]]),
-    #      np.array([[-0.12673638, -1.36861282, 1.21848065, -0.85750144],
-    #                [-0.56147088, -1.0335199, 0.35877096, 1.07368134],
-    #                [-0.37550472, 0.39636757, -0.47144628, 2.33660781]]),
-    #      np.array([[0.9398248, 0.42628539, -0.75815703]])
-    #      ]
-    # b = [np.array([[1.38503523],
-    #                [-0.51962709],
-    #                [-0.78015214],
-    #                [0.95560959]]),
-    #      np.array([[1.50278553],
-    #                [-0.59545972],
-    #                [0.52834106]]), np.array([[-0.16236698]])]
-    #
-    # # print(W.shape, b.shape)
-    #
-    # network_obj.weights = W
-    # network_obj.biases = b
-    #
-    # expected_result = [[0.55865298, 0.52006807, 0.51071853, 0.53912084]]
-    # print(network_obj.forward_propagation(X)[0])
-    #
-    # # ----- Check cost_cross_entropy()
-    # print("----- Check cost_cross_entropy()")
-    # y = np.array([[1, 1, 1]])
-    # y_h = np.array([[0.8, 0.9, 0.4]])
-    #
-    # expected_result = 0.41493159961539694
-    # print(network_obj.cost_cross_entropy(y, y_h))
-    #
-    # # ----- Check _one_layer_linear_backward()
-    #
-    # dZ = np.array([[1.62434536, -0.61175641]])
-    # linear_cache = (np.array([[-0.52817175, -1.07296862],
-    #                           [0.86540763, -2.3015387],
-    #                           [1.74481176, -0.7612069]]),
-    #                 np.array([[0.3190391, -0.24937038, 1.46210794]]),
-    #                 np.array([[-2.06014071]]))
-    #
-    # expected_result = (np.array([[0.51822968, -0.19517421],
-    #                              [-0.40506362, 0.15255393],
-    #                              [2.37496825, -0.8944539]]),
-    #                    np.array([[-0.10076895, 1.40685096, 1.64992504]]),
-    #                    np.array([[0.50629448]]))
-    # print(network_obj._one_layer_linear_backward(dz=dZ, cache=linear_cache))
-    #
-    # # ----- Check _one_layer_backward_propagation()
-    # print("----- Check _one_layer_backward_propagation()")
-    #
-    # dAL = [[-0.41675785, -0.05626683]]
-    # linear_activation_cache = ((np.array([[-2.1361961, 1.64027081],
-    #                                       [-1.79343559, -0.84174737],
-    #                                       [0.50288142, -1.24528809]]),
-    #                             np.array([[-1.05795222, -0.90900761, 0.55145404]]),
-    #                             np.array([[2.29220801]])),
-    #                            np.array([[0.04153939, -1.11792545]]))
-    #
-    # expected_result = (np.array([[0.11017994, 0.0110534],
-    #                              [0.09466817, 0.00949723],
-    #                              [-0.05743092, -0.00576155]]),
-    #                    np.array([[0.10266786, 0.09778551, -0.01968084]]),
-    #                    np.array([[-0.05729622]]))
-    # print(network_obj._one_layer_backward_propagation(dAL, linear_activation_cache))
-    #
-    # # ----- Check backward_propagation()
-    # print("----- Check backward_propagation()")
-    #
-    # AL = np.array([[1.78862847, 0.43650985]])
-    # Y_assess = np.array([[1, 0]])
-    # caches = (((np.array([[0.09649747, -1.8634927],
-    #                       [-0.2773882, -0.35475898],
-    #                       [-0.08274148, -0.62700068],
-    #                       [-0.04381817, -0.47721803]]),
-    #             np.array([[-1.31386475, 0.88462238, 0.88131804, 1.70957306],
-    #                       [0.05003364, -0.40467741, -0.54535995, -1.54647732],
-    #                       [0.98236743, -1.10106763, -1.18504653, -0.2056499]]),
-    #             np.array([[1.48614836],
-    #                       [0.23671627],
-    #                       [-1.02378514]])),
-    #            np.array([[-0.7129932, 0.62524497],
-    #                      [-0.16051336, -0.76883635],
-    #                      [-0.23003072, 0.74505627]])),
-    #           ((np.array([[1.97611078, -1.24412333],
-    #                       [-0.62641691, -0.80376609],
-    #                       [-2.41908317, -0.92379202]]),
-    #             np.array([[-1.02387576, 1.12397796,
-    #                        -0.13191423]]),
-    #             np.array([[-1.62328545]])),
-    #            np.array([[0.64667545, -0.35627076]])))
-    #
-    # print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[1][1])
-    #
-    # # ----- Check update_parameters()
-    # print("----- Check update_parameters()")
-    #
-    # W = [np.array([[-0.41675785, -0.05626683, -2.1361961, 1.64027081],
-    #                [-1.79343559, -0.84174737, 0.50288142, -1.24528809],
-    #                [-1.05795222, -0.90900761, 0.55145404, 2.29220801]]),
-    #      np.array([[-0.5961597, -0.0191305, 1.17500122]])]
-    # b = [np.array([[0.04153939],
-    #                [-1.11792545],
-    #                [0.53905832]]),
-    #      np.array([[-0.74787095]])]
-    #
-    # grads = [("da1NotUsed",
-    #           np.array([[1.78862847, 0.43650985, 0.09649747, -1.8634927],
-    #                     [-0.2773882, -0.35475898, -0.08274148, -0.62700068],
-    #                     [-0.04381817, -0.47721803, -1.31386475, 0.88462238]]),
-    #           np.array([[0.88131804],
-    #                     [1.70957306],
-    #                     [0.05003364]])),
-    #          ("da2NotUsed",
-    #           np.array([[-0.40467741, -0.54535995, -1.54647732]]),
-    #           np.array([[0.98236743]]))]
-    # network_obj.weights = W
-    # network_obj.biases = b
-    # network_obj.update_parameters(grads, 0.1)
-    # print("\n\nW:{}, \nb:{}".format(network_obj.weights, network_obj.biases))
+    # ----- Check _one_layer_forward_propagation()
+    print("----- Check _one_layer_forward_propagation()")
+    X = np.array([[-0.31178367, 0.72900392, 0.21782079, -0.8990918],
+                  [-2.48678065, 0.91325152, 1.12706373, -1.51409323],
+                  [1.63929108, -0.4298936, 2.63128056, 0.60182225],
+                  [-0.33588161, 1.23773784, 0.11112817, 0.12915125],
+                  [0.07612761, -0.15512816, 0.63422534, 0.810655]])
+
+    W = [np.array([[0.35480861, 1.81259031, -1.3564758, -0.46363197, 0.82465384],
+                   [-1.17643148, 1.56448966, 0.71270509, -0.1810066, 0.53419953],
+                   [-0.58661296, -1.48185327, 0.85724762, 0.94309899, 0.11444143],
+                   [-0.02195668, -2.12714455, -0.83440747, -0.46550831, 0.23371059]]),
+         np.array([[-0.12673638, -1.36861282, 1.21848065, -0.85750144],
+                   [-0.56147088, -1.0335199, 0.35877096, 1.07368134],
+                   [-0.37550472, 0.39636757, -0.47144628, 2.33660781]]),
+         np.array([[0.9398248, 0.42628539, -0.75815703]])
+         ]
+    b = [np.array([[1.38503523],
+                   [-0.51962709],
+                   [-0.78015214],
+                   [0.95560959]]),
+         np.array([[1.50278553],
+                   [-0.59545972],
+                   [0.52834106]]), np.array([[-0.16236698]])]
+
+    # print(W.shape, b.shape)
+
+    network_obj.weights = W
+    network_obj.biases = b
+
+    expected_result = [[0.55865298, 0.52006807, 0.51071853, 0.53912084]]
+    print(network_obj.forward_propagation(X)[0])
+
+    # ----- Check cost_cross_entropy()
+    print("----- Check cost_cross_entropy()")
+    y = np.array([[1, 1, 1]])
+    y_h = np.array([[0.8, 0.9, 0.4]])
+
+    expected_result = 0.41493159961539694
+    print(network_obj.cost_cross_entropy(y, y_h))
+
+    # ----- Check _one_layer_linear_backward()
+    print("----- Check _one_layer_linear_backward()")
+
+    dZ = np.array([[1.62434536, -0.61175641]])
+    linear_cache = (np.array([[-0.52817175, -1.07296862],
+                              [0.86540763, -2.3015387],
+                              [1.74481176, -0.7612069]]),
+                    np.array([[0.3190391, -0.24937038, 1.46210794]]),
+                    np.array([[-2.06014071]]))
+
+    expected_result = (np.array([[0.51822968, -0.19517421],
+                                 [-0.40506362, 0.15255393],
+                                 [2.37496825, -0.8944539]]),
+                       np.array([[-0.10076895, 1.40685096, 1.64992504]]),
+                       np.array([[0.50629448]]))
+    print(network_obj._one_layer_linear_backward(dz=dZ, cache=linear_cache))
+
+    # ----- Check _one_layer_backward_propagation()
+    print("----- Check _one_layer_backward_propagation()")
+
+    dAL = np.array([[-0.41675785, -0.05626683]])
+    linear_activation_cache = ((np.array([[-2.1361961, 1.64027081],
+                                          [-1.79343559, -0.84174737],
+                                          [0.50288142, -1.24528809]]),
+                                np.array([[-1.05795222, -0.90900761, 0.55145404]]),
+                                np.array([[2.29220801]])),
+                               np.array([[0.04153939, -1.11792545]]))
+
+    expected_result = (np.array([[0.11017994, 0.0110534],
+                                 [0.09466817, 0.00949723],
+                                 [-0.05743092, -0.00576155]]),
+                       np.array([[0.10266786, 0.09778551, -0.01968084]]),
+                       np.array([[-0.05729622]]))
+    print(network_obj._one_layer_backward_propagation(dAL, linear_activation_cache))
+
+    # ----- Check backward_propagation()
+    print("----- Check backward_propagation()")
+
+    AL = np.array([[1.78862847, 0.43650985]])
+    Y_assess = np.array([[1, 0]])
+    caches = (((np.array([[0.09649747, -1.8634927],
+                          [-0.2773882, -0.35475898],
+                          [-0.08274148, -0.62700068],
+                          [-0.04381817, -0.47721803]]),
+                np.array([[-1.31386475, 0.88462238, 0.88131804, 1.70957306],
+                          [0.05003364, -0.40467741, -0.54535995, -1.54647732],
+                          [0.98236743, -1.10106763, -1.18504653, -0.2056499]]),
+                np.array([[1.48614836],
+                          [0.23671627],
+                          [-1.02378514]])),
+               np.array([[-0.7129932, 0.62524497],
+                         [-0.16051336, -0.76883635],
+                         [-0.23003072, 0.74505627]])),
+              ((np.array([[1.97611078, -1.24412333],
+                          [-0.62641691, -0.80376609],
+                          [-2.41908317, -0.92379202]]),
+                np.array([[-1.02387576, 1.12397796,
+                           -0.13191423]]),
+                np.array([[-1.62328545]])),
+               np.array([[0.64667545, -0.35627076]])))
+
+    expected_result = [[-0.39202432 -0.13325855 -0.04601089]]
+
+    print("\n\n", network_obj.backward_propagation(AL, Y_assess, caches)[1][1])
+
+    # ----- Check update_parameters()
+    print("----- Check update_parameters()")
+
+    W = [np.array([[-0.41675785, -0.05626683, -2.1361961, 1.64027081],
+                   [-1.79343559, -0.84174737, 0.50288142, -1.24528809],
+                   [-1.05795222, -0.90900761, 0.55145404, 2.29220801]]),
+         np.array([[-0.5961597, -0.0191305, 1.17500122]])]
+    b = [np.array([[0.04153939],
+                   [-1.11792545],
+                   [0.53905832]]),
+         np.array([[-0.74787095]])]
+
+    grads = [("da1NotUsed",
+              np.array([[1.78862847, 0.43650985, 0.09649747, -1.8634927],
+                        [-0.2773882, -0.35475898, -0.08274148, -0.62700068],
+                        [-0.04381817, -0.47721803, -1.31386475, 0.88462238]]),
+              np.array([[0.88131804],
+                        [1.70957306],
+                        [0.05003364]])),
+             ("da2NotUsed",
+              np.array([[-0.40467741, -0.54535995, -1.54647732]]),
+              np.array([[0.98236743]]))]
+    network_obj.weights = W
+    network_obj.biases = b
+    network_obj.update_parameters(grads, 0.1)
+
+    """
+     Expected Result:
+        W:[array([[-0.5956207 , -0.09991781, -2.14584585,  1.82662008],
+       [-1.76569677, -0.80627147,  0.51115557, -1.18258802],
+       [-1.0535704 , -0.86128581,  0.68284051,  2.20374577]]), array([[-0.55569196,  0.0354055 ,  1.32964895]])],
+        b:[array([[-0.04659241],
+       [-1.28888276],
+       [ 0.53405496]]), array([[-0.84610769]])]
+
+    """
+    print("\n\nW:{}, \nb:{}".format(network_obj.weights, network_obj.biases))

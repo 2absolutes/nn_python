@@ -12,8 +12,16 @@ __global__ void matmul(const float *matrix1, const float *matrix2, float *out_ma
 
         float current_cell_sum = 0.0;
         for(int i = 0; i < matrix1_ncol; i++){
-//            printf("%d: %f * %f = %f\n", row * matrix2_ncol + col, matrix1[row * matrix1_ncol + i], matrix2[i * matrix2_ncol + col], matrix1[row * matrix1_ncol + i] * matrix2[i * matrix2_ncol + col]);
-            printf("(row: %d, col: %d): %d * %d = %f\n", row, col, row * matrix1_ncol + i, i * matrix2_ncol + col, matrix1[row * matrix1_ncol + i] * matrix2[i * matrix2_ncol + col]);
+            if (debug)
+            {
+                printf("matrix1[%d] :: %f * matrix2[%d] :: %f = output[%d]%f\n",
+                row * matrix1_ncol + i,
+                matrix1[row * matrix1_ncol + i],
+                i * matrix2_ncol + col,
+                matrix2[i * matrix2_ncol + col],
+                row * matrix2_ncol + col,
+                matrix1[row * matrix1_ncol + i] * matrix2[i * matrix2_ncol + col]);
+            }
             current_cell_sum += matrix1[row * matrix1_ncol + i] * matrix2[i * matrix2_ncol + col];
         }
 
