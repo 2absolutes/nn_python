@@ -1,4 +1,6 @@
 # coding=utf-8
+import os
+import sys
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -8,6 +10,8 @@ from cpu_nn.nn import Network as network_cpu
 from gpu_nn.nn import Network as network_gpu
 from sklearn.neural_network import MLPClassifier
 
+DIR_PATH = os.path.realpath("..")
+sys.path.append(DIR_PATH)
 
 def read_data(data_path, header=None):
     # raw_data = np.genfromtxt(data_path, delimiter=',', dtype=None)
@@ -140,7 +144,7 @@ if __name__ == "__main__":
     feature_size = train_data_x.shape[0]
     trained_model = L_layer_model(train_data_x, train_data_y, [feature_size, 2, 1], num_iterations=10,
                                   batch_size=10,
-                                  computation="cpu",
+                                  computation="gpu",
                                   print_cost=True, seed=1)
     #
     y_hat, _ = trained_model.forward_propagation(test_data_x)

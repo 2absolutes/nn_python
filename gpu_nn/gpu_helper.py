@@ -19,7 +19,6 @@ GRID_DIMS = (1, 1, 1)
 
 DIR_PATH = os.path.realpath(".")
 sys.path.append(DIR_PATH)
-print("dir vdswv", DIR_PATH)
 
 
 def matrix_multiplication(matrix1, matrix2, debug=0):

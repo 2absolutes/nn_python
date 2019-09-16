@@ -4,7 +4,6 @@ import sys
 
 DIR_PATH = os.path.realpath("..")
 sys.path.append(DIR_PATH)
-print("dir", DIR_PATH)
 from gpu_nn import gpu_helper
 
 
